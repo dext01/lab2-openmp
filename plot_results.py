@@ -1,20 +1,8 @@
 """
-plot_results.py
-Строит графики для заданий 2 и 3.
-
-Запуск:  python3 plot_results.py
-
-Ожидаемые файлы рядом со скриптом:
-  2_2_results_integrate.txt
-  2_3_results_v1.txt
-  2_3_results_v2.txt
-
-Выходные PDF:
-  speedup_integrate.pdf
-  lab2_graphs.pdf
+plot_results.py  —  строит графики для заданий 2 и 3
+Запуск: python3 plot_results.py
 """
 
-import re
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -29,79 +17,63 @@ plt.rcParams.update({
     "figure.dpi": 150,
 })
 
-# ──────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────
 
-def parse_integrate(filename):
-    """
-    Parse lines like:
-    nsteps=40000000, threads=8, T_serial=0.1, T_parallel=0.02, Speedup=5.0, Error=2.7e-08
-    """
-    threads, t_ser, t_par, speedup = [], [], [], []
+def load_table(filename, skip_comments=True):
+    rows = []
     with open(filename) as f:
         for line in f:
-            m = re.search(
-                r"threads=(\d+).*T_serial=([\d.]+).*T_parallel=([\d.]+).*Speedup=([\d.]+)",
-                line)
-            if m:
-                threads.append(int(m.group(1)))
-                t_ser.append(float(m.group(2)))
-                t_par.append(float(m.group(3)))
-                speedup.append(float(m.group(4)))
-    return threads, t_ser, t_par, speedup
-
-
-def parse_sla(filename):
-    """
-    Parse lines like:
-    N=14000, variant=1, threads=4, time=7.92, iterations=144, max_error=0.0
-    """
-    threads, times, iters = [], [], []
-    with open(filename) as f:
-        for line in f:
-            m = re.search(
-                r"threads=(\d+).*time=([\d.]+).*iterations=(\d+)",
-                line)
-            if m:
-                threads.append(int(m.group(1)))
-                times.append(float(m.group(2)))
-                iters.append(int(m.group(3)))
-    return threads, times, iters
-
-
-def linear(p_list):
-    return list(range(1, max(p_list) + 1))
+            line = line.strip()
+            if not line or (skip_comments and line.startswith("#")):
+                continue
+            rows.append(list(map(float, line.split())))
+    return rows
 
 
 # ──────────────────────────────────────────────────────────────
 # Task 2 — Numerical Integration
+# Формат: threads  T_serial_min  T_parallel_min  Speedup_best  Efficiency
 # ──────────────────────────────────────────────────────────────
-
 try:
-    thr2, ts2, tp2, sp2 = parse_integrate("2_2_results_integrate.txt")
+    rows2 = load_table("2_2_results_integrate.txt")
+    thr2  = [r[0] for r in rows2]
+    ts2   = [r[1] for r in rows2]
+    tp2   = [r[2] for r in rows2]
+    sp2   = [r[3] for r in rows2]
+    eff2  = [r[4] for r in rows2]
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
-    fig.suptitle("Task 2 — Numerical Integration (nsteps = 40 000 000)", fontweight="bold")
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle("Task 2 — Numerical Integration  (nsteps = 40 000 000, best of 100 runs)",
+                 fontweight="bold")
+    p_lin = list(range(1, int(max(thr2)) + 1))
 
-    # Left: execution time
+    # Execution time
     ax = axes[0]
-    ax.plot(thr2, ts2, "s--", color="gray",  label="Serial (1 thread, min of 100 runs)")
-    ax.plot(thr2, tp2, "o-",  color="steelblue", linewidth=2, label="Parallel (min of 100 runs)")
+    ax.plot(thr2, ts2, "s--", color="gray",      linewidth=1.5, label="Serial (1 thread)")
+    ax.plot(thr2, tp2, "o-",  color="steelblue", linewidth=2,   label="Parallel")
     ax.set_xlabel("Number of threads (p)")
     ax.set_ylabel("Time, sec")
     ax.set_title("Execution Time")
     ax.legend()
     ax.xaxis.set_major_locator(ticker.FixedLocator(thr2))
 
-    # Right: speedup
+    # Speedup
     ax = axes[1]
-    p_lin = list(range(1, max(thr2) + 1))
     ax.plot(p_lin, p_lin, "k--", linewidth=1.2, label="Linear speedup")
     ax.plot(thr2, sp2, "o-", color="steelblue", linewidth=2, label="nsteps = 40 000 000")
     ax.set_xlabel("Number of threads (p)")
     ax.set_ylabel("Speedup $S_p$")
-    ax.set_title("Speedup vs Number of Threads")
+    ax.set_title("Speedup")
+    ax.legend()
+    ax.xaxis.set_major_locator(ticker.FixedLocator(thr2))
+
+    # Efficiency
+    ax = axes[2]
+    ax.axhline(1.0, color="k", linestyle="--", linewidth=1.2, label="Ideal")
+    ax.plot(thr2, eff2, "o-", color="steelblue", linewidth=2, label="nsteps = 40 000 000")
+    ax.set_xlabel("Number of threads (p)")
+    ax.set_ylabel("Efficiency $E_p$")
+    ax.set_title("Efficiency")
+    ax.set_ylim(0, 1.15)
     ax.legend()
     ax.xaxis.set_major_locator(ticker.FixedLocator(thr2))
 
@@ -115,42 +87,38 @@ except FileNotFoundError as e:
 
 
 # ──────────────────────────────────────────────────────────────
-# Task 3 — SLA (Simple Iteration, Variants 1 & 2)
+# Task 3 — SLA (Variants 1 & 2)
+# Формат: variant  threads  time_min  speedup  efficiency
 # ──────────────────────────────────────────────────────────────
-
 try:
-    thr1, t1, _ = parse_sla("2_3_results_v1.txt")
-    thr2b, t2, _ = parse_sla("2_3_results_v2.txt")
+    rows3 = load_table("2_3_results.txt")
+    v1 = [r for r in rows3 if r[0] == 1]
+    v2 = [r for r in rows3 if r[0] == 2]
 
-    # Serial baseline = time at 1 thread
-    T1_ser = t1[0]
-    T2_ser = t2[0]
-
-    sp1 = [T1_ser / t for t in t1]
-    sp2b = [T2_ser / t for t in t2]
-
-    eff1 = [s / p for s, p in zip(sp1,  thr1)]
-    eff2 = [s / p for s, p in zip(sp2b, thr2b)]
+    thr1  = [r[1] for r in v1];  t1  = [r[2] for r in v1]
+    sp1   = [r[3] for r in v1];  eff1 = [r[4] for r in v1]
+    thr2b = [r[1] for r in v2];  t2  = [r[2] for r in v2]
+    sp2b  = [r[3] for r in v2];  eff2b = [r[4] for r in v2]
 
     all_thr = sorted(set(thr1 + thr2b))
-    p_lin   = list(range(1, max(all_thr) + 1))
+    p_lin   = list(range(1, int(max(all_thr)) + 1))
+    colors  = {"v1": "steelblue", "v2": "darkorange"}
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-    fig.suptitle("Task 3 — SLA Simple Iteration (N = 14 000, min of 3 runs)", fontweight="bold")
+    fig.suptitle("Task 3 — SLA Simple Iteration  (N = 14 000, best of 3 runs)",
+                 fontweight="bold")
 
-    colors = {"v1": "steelblue", "v2": "darkorange"}
-
-    # ── Execution time ──
+    # Execution time
     ax = axes[0]
-    ax.plot(thr1,  t1, "o-", color=colors["v1"], linewidth=2, label="Variant 1")
-    ax.plot(thr2b, t2, "s-", color=colors["v2"], linewidth=2, label="Variant 2")
+    ax.plot(thr1,  t1,  "o-", color=colors["v1"], linewidth=2, label="Variant 1")
+    ax.plot(thr2b, t2,  "s-", color=colors["v2"], linewidth=2, label="Variant 2")
     ax.set_xlabel("Threads (p)")
     ax.set_ylabel("Time T(p), sec")
     ax.set_title("Execution Time")
     ax.legend()
     ax.xaxis.set_major_locator(ticker.FixedLocator(all_thr))
 
-    # ── Speedup ──
+    # Speedup
     ax = axes[1]
     ax.plot(p_lin, p_lin, "k--", linewidth=1.2, label="Linear")
     ax.plot(thr1,  sp1,  "o-", color=colors["v1"], linewidth=2, label="Variant 1")
@@ -161,11 +129,11 @@ try:
     ax.legend()
     ax.xaxis.set_major_locator(ticker.FixedLocator(all_thr))
 
-    # ── Efficiency ──
+    # Efficiency
     ax = axes[2]
     ax.axhline(1.0, color="k", linestyle="--", linewidth=1.2, label="Ideal")
-    ax.plot(thr1,  eff1, "o-", color=colors["v1"], linewidth=2, label="Variant 1")
-    ax.plot(thr2b, eff2, "s-", color=colors["v2"], linewidth=2, label="Variant 2")
+    ax.plot(thr1,  eff1,  "o-", color=colors["v1"], linewidth=2, label="Variant 1")
+    ax.plot(thr2b, eff2b, "s-", color=colors["v2"], linewidth=2, label="Variant 2")
     ax.set_xlabel("Threads (p)")
     ax.set_ylabel("Efficiency E(p)")
     ax.set_title("Efficiency")
@@ -180,5 +148,67 @@ try:
 
 except FileNotFoundError as e:
     print(f"[WARN] Skipping task 3 plot: {e}")
+
+
+# ──────────────────────────────────────────────────────────────
+# Task 3 — Schedule Research
+# Формат: schedule  chunk  threads  time_min  time_avg
+# ──────────────────────────────────────────────────────────────
+try:
+    sched_data = {}
+    with open("2_3_schedule_results.txt") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            sched, chunk, threads = parts[0], int(parts[1]), int(parts[2])
+            t_min, t_avg = float(parts[3]), float(parts[4])
+            key = (sched, chunk)
+            sched_data[key] = {"min": t_min, "avg": t_avg, "threads": threads}
+
+    schedules = ["static", "dynamic", "guided"]
+    chunks    = [10, 25, 50, 100]
+    colors_s  = {"static": "steelblue", "dynamic": "darkorange", "guided": "forestgreen"}
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle("Task 3 — Schedule Research  (N = 14 000, 8 threads, best of 100 runs)",
+                 fontweight="bold")
+
+    x      = np.arange(len(chunks))
+    width  = 0.25
+    labels = [str(c) for c in chunks]
+
+    # Min time grouped bar chart
+    ax = axes[0]
+    for idx, sched in enumerate(schedules):
+        vals = [sched_data.get((sched, c), {}).get("min", 0) for c in chunks]
+        ax.bar(x + idx * width, vals, width, label=sched, color=colors_s[sched], alpha=0.85)
+    ax.set_xlabel("Chunk size")
+    ax.set_ylabel("Min time, sec")
+    ax.set_title("Min Execution Time by Schedule & Chunk")
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    # Avg time
+    ax = axes[1]
+    for idx, sched in enumerate(schedules):
+        vals = [sched_data.get((sched, c), {}).get("avg", 0) for c in chunks]
+        ax.bar(x + idx * width, vals, width, label=sched, color=colors_s[sched], alpha=0.85)
+    ax.set_xlabel("Chunk size")
+    ax.set_ylabel("Avg time, sec")
+    ax.set_title("Avg Execution Time by Schedule & Chunk")
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    plt.tight_layout()
+    plt.savefig("schedule_research.pdf", bbox_inches="tight")
+    plt.close()
+    print("Saved: schedule_research.pdf")
+
+except FileNotFoundError as e:
+    print(f"[WARN] Skipping schedule plot: {e}")
 
 print("Done.")
