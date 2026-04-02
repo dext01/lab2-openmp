@@ -20,7 +20,7 @@ int solve_variant_1(std::vector<double>& x) {
         for (int i = 0; i < N; ++i) {
             double sum = 0.0;
             for (int j = 0; j < N; ++j)
-                sum += (i == j ? DIAG_VAL : OFF_DIAG_VAL) * x[j];
+                sum += (i == j ? 2.0 : 1.0) * x[j];
             Ax[i] = sum;
         }
         #pragma omp parallel for schedule(static)
