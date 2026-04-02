@@ -6,7 +6,7 @@
 
 const int    N            = 14000;
 const double EPS          = 1e-5;
-const double TAU          = 0.01;
+const double TAU          = 0.0001;
 const double DIAG_VAL     = 2.0;
 const double OFF_DIAG_VAL = 1.0;
 
