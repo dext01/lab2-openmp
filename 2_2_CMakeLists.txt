@@ -1,11 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(Integrate LANGUAGES CXX)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 find_package(OpenMP REQUIRED)
-
 add_executable(integrate main.cpp)
 target_link_libraries(integrate OpenMP::OpenMP_CXX)
 target_compile_options(integrate PRIVATE -O3 -march=native -DNDEBUG)
