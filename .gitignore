@@ -1,0 +1,11 @@
+# Игнорируем сборки и результаты
+build_*/
+*.csv
+*.png
+*.log
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+*.out
+.DS_Store
