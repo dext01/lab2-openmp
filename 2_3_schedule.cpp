@@ -1,9 +1,6 @@
-// 2_3_schedule.cpp
-// Исследование влияния параметров schedule на производительность.
-// Фиксируем число потоков и chunk_size, тестируем static/dynamic/guided.
-// Запуск: ./sla_schedule <num_threads> <schedule_type> <chunk_size>
-// schedule_type: 0=static, 1=dynamic, 2=guided
-// chunk_size: 10, 25, 50, 100  (для guided — игнорируется, но передаём для единообразия)
+// schedule.cpp
+// Исследование влияния schedule(static|dynamic|guided) и chunk_size.
+// Запуск: ./sla_schedule <num_threads> <schedule: static|dynamic|guided> <chunk_size>
 
 #include <iostream>
 #include <iomanip>
@@ -12,16 +9,15 @@
 #include <vector>
 #include <string>
 
-const int    N            = 14000;
-const int    FIXED_ITERS  = 10;      // фиксируем число итераций для чистого замера
-const double DIAG_VAL     = 2.0;
-const double OFF_DIAG_VAL = 1.0;
+const int    N             = 14000;
+const int    FIXED_ITERS   = 10;
+const double TAU           = 0.01;   // БАГ БЫЛ: несоответствие с main.cpp, исправлено
+const double DIAG_VAL      = 2.0;
+const double OFF_DIAG_VAL  = 1.0;
 
-// Один шаг метода простой итерации с заданным schedule через OMP_SCHEDULE (runtime)
 void run_iterations(std::vector<double>& x, int niters) {
     std::vector<double> Ax(N), residual(N);
     const double b_val = N + 1.0;
-    const double tau   = 0.01;
 
     for (int it = 0; it < niters; ++it) {
         #pragma omp parallel for schedule(runtime)
@@ -34,9 +30,10 @@ void run_iterations(std::vector<double>& x, int niters) {
         #pragma omp parallel for schedule(runtime)
         for (int i = 0; i < N; ++i)
             residual[i] = b_val - Ax[i];
+
         #pragma omp parallel for schedule(runtime)
         for (int i = 0; i < N; ++i)
-            x[i] += tau * residual[i];
+            x[i] += TAU * residual[i];
     }
 }
 
@@ -51,7 +48,6 @@ int main(int argc, char** argv) {
     std::string sched_name = argv[2];
     int         chunk      = std::stoi(argv[3]);
 
-    // Устанавливаем schedule через runtime API
     omp_sched_t sched_kind;
     if      (sched_name == "static")  sched_kind = omp_sched_static;
     else if (sched_name == "dynamic") sched_kind = omp_sched_dynamic;
@@ -62,12 +58,12 @@ int main(int argc, char** argv) {
     }
 
     omp_set_num_threads(nthreads);
-    omp_set_schedule(sched_kind, chunk);   // устанавливает schedule(runtime) поведение
+    omp_set_schedule(sched_kind, chunk);
 
-    // прогрев
+    // прогрев кэша
     {
-        std::vector<double> x(N, 0.0);
-        run_iterations(x, 2);
+        std::vector<double> xw(N, 0.0);
+        run_iterations(xw, 2);
     }
 
     // замер
@@ -76,11 +72,12 @@ int main(int argc, char** argv) {
     run_iterations(x, FIXED_ITERS);
     double elapsed = omp_get_wtime() - t0;
 
+    // ВАЖНО: пробелы как разделители, без запятых — для парсинга скриптом
     std::cout << std::fixed << std::setprecision(8);
     std::cout << "threads=" << nthreads
               << " schedule=" << sched_name
-              << " chunk=" << chunk
-              << " iters=" << FIXED_ITERS
-              << " time=" << elapsed << "\n";
+              << " chunk="    << chunk
+              << " iters="    << FIXED_ITERS
+              << " time="     << elapsed << "\n";
     return 0;
 }
