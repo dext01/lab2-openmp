@@ -4,10 +4,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(OpenMP REQUIRED)
 
-add_executable(sla_solve main.cpp)
+add_executable(sla_solve 2_3_main.cpp)
 target_link_libraries(sla_solve OpenMP::OpenMP_CXX)
 target_compile_options(sla_solve PRIVATE -O3 -march=native -DNDEBUG)
 
-add_executable(sla_schedule schedule.cpp)
+add_executable(sla_schedule 2_3_schedule.cpp)
 target_link_libraries(sla_schedule OpenMP::OpenMP_CXX)
 target_compile_options(sla_schedule PRIVATE -O3 -march=native -DNDEBUG)

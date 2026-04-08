@@ -97,7 +97,7 @@ echo "============================================="
 rm -rf "$SCRIPT_DIR/build_2_2"
 mkdir  "$SCRIPT_DIR/build_2_2"
 cd     "$SCRIPT_DIR/build_2_2"
-cmake  "$SCRIPT_DIR/2_2" -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF -Wno-dev > /dev/null
+cmake  "$SCRIPT_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF -Wno-dev > /dev/null
 make -j$(nproc) 2>&1 | tail -3
 cd "$SCRIPT_DIR"
 echo "Task 2 built."
@@ -106,7 +106,7 @@ echo "Task 2 built."
 rm -rf "$SCRIPT_DIR/build_2_3"
 mkdir  "$SCRIPT_DIR/build_2_3"
 cd     "$SCRIPT_DIR/build_2_3"
-cmake  "$SCRIPT_DIR/2_3" -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF -Wno-dev > /dev/null
+cmake  "$SCRIPT_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF -Wno-dev > /dev/null
 make -j$(nproc) 2>&1 | tail -3
 cd "$SCRIPT_DIR"
 echo "Task 3 built."
@@ -119,7 +119,7 @@ echo "============================================="
 echo " TASK 2: Numerical Integration (${N_RUNS} runs each)"
 echo "============================================="
 
-RAW2="$SCRIPT_DIR/2_2_raw.txt"
+RAW2="$SCRIPT_DIR_raw.txt"
 > "$RAW2"
 
 for p in $THREADS; do
@@ -131,7 +131,7 @@ for p in $THREADS; do
 done
 
 # Сводный файл: одна строка на конфиг (лучшее время из 100)
-METRICS2="$SCRIPT_DIR/2_2_results_integrate.txt"
+METRICS2="$SCRIPT_DIR_results_integrate.txt"
 > "$METRICS2"
 echo "# threads  T_serial_min  T_parallel_min  Speedup_best  Efficiency" >> "$METRICS2"
 
@@ -168,7 +168,7 @@ echo " TASK 3: SLA Simple Iteration (${SLA_RUNS} runs each)"
 echo " (3 runs: each solve takes ~30s on 1 thread)"
 echo "============================================="
 
-RAW3="$SCRIPT_DIR/2_3_raw.txt"
+RAW3="$SCRIPT_DIR_raw.txt"
 > "$RAW3"
 
 for variant in 1 2; do
@@ -182,7 +182,7 @@ for variant in 1 2; do
 done
 
 # Сводный файл для графиков
-METRICS3="$SCRIPT_DIR/2_3_results.txt"
+METRICS3="$SCRIPT_DIR_results.txt"
 > "$METRICS3"
 echo "# variant  threads  time_min  speedup  efficiency" >> "$METRICS3"
 
@@ -222,7 +222,7 @@ FIXED_THREADS=8   # фиксируем число потоков для иссл
 SCHEDULES="static dynamic guided"
 CHUNKS="10 25 50 100"
 
-RAW_SCHED="$SCRIPT_DIR/2_3_schedule_raw.txt"
+RAW_SCHED="$SCRIPT_DIR_schedule_raw.txt"
 > "$RAW_SCHED"
 
 for sched in $SCHEDULES; do
@@ -235,7 +235,7 @@ for sched in $SCHEDULES; do
     done
 done
 
-METRICS_SCHED="$SCRIPT_DIR/2_3_schedule_results.txt"
+METRICS_SCHED="$SCRIPT_DIR_schedule_results.txt"
 > "$METRICS_SCHED"
 echo "# schedule  chunk  threads  time_min  time_avg" >> "$METRICS_SCHED"
 
