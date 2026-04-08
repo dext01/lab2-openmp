@@ -1,7 +1,6 @@
 ```
 # Build artifacts
 build/
-cmake-build-*/
 
 # Dependencies
 venv/
