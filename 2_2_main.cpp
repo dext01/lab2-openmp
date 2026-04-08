@@ -47,11 +47,11 @@ int main(int argc, char** argv) {
     }
     const double a       = -4.0;
     const double b       =  4.0;
-    const int    nsteps  = 40'000'000;
+    const int    nsteps  = 40000000;
     const double exact   = exact_integral(a, b);
     const int    nthreads = std::stoi(argv[1]);
 
-    // serial baseline
+    // serial baseline (1 thread)
     omp_set_num_threads(1);
     double t0    = omp_get_wtime();
     double res_s = integrate_serial(a, b, nsteps);
@@ -67,6 +67,7 @@ int main(int argc, char** argv) {
     double speedup = t_ser / t_par;
     double error   = std::abs(res_p - exact);
 
+    // ВАЖНО: пробелы как разделители, без запятых — для парсинга скриптом
     std::cout << std::fixed << std::setprecision(10);
     std::cout << "nsteps=" << nsteps
               << " threads=" << nthreads
