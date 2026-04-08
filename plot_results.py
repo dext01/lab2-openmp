@@ -1,4 +1,265 @@
 """
+plot_results.py — парсит сырые данные, считает метрики, строит 3 PDF.
+Запуск: python3 plot_results.py
+"""
+
+import os, statistics
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
+
+plt.rcParams.update({
+    "font.size": 12, "axes.grid": True,
+    "grid.linestyle": "--", "grid.alpha": 0.5, "figure.dpi": 150,
+})
+
+
+def parse_file(filename):
+    """Парсит строки формата key=value key=value ..."""
+    rows = []
+    with open(filename) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            try:
+                d = {}
+                for token in line.split():
+                    if "=" in token:
+                        k, v = token.split("=", 1)
+                        try:    d[k] = float(v)
+                        except: d[k] = v
+                if d:
+                    rows.append(d)
+            except Exception as e:
+                print(f"  [WARN] skip: {line!r} ({e})")
+    return rows
+
+
+def filt(rows, **kw):
+    return [r for r in rows if all(r.get(k) == v for k, v in kw.items())]
+
+
+def met(vals):
+    if not vals: return None
+    return dict(min=min(vals), max=max(vals),
+                avg=statistics.mean(vals),
+                stdev=statistics.stdev(vals) if len(vals)>1 else 0,
+                n=len(vals))
+
+
+# ──────────────────────────────────────────────────────────────
+# TASK 2 — Numerical Integration
+# ──────────────────────────────────────────────────────────────
+print("=" * 55)
+print("TASK 2 — Numerical Integration")
+print("=" * 55)
+
+try:
+    rows2 = parse_file("2_2_raw.txt")
+    print(f"  Loaded {len(rows2)} rows")
+
+    threads_list = sorted(set(int(r["threads"]) for r in rows2))
+
+    # Базовое время serial = min из всех строк
+    t_ser_base = min(r["T_serial"] for r in rows2)
+
+    thr2, tp_min_l, tp_avg_l, sp_l, eff_l = [], [], [], [], []
+
+    print(f"\n  {'p':>4} {'n':>4} {'Tser_min':>10} {'Tpar_min':>10} "
+          f"{'Tpar_avg':>10} {'Speedup':>9} {'Eff':>7}")
+    print("  " + "-"*60)
+
+    for p in threads_list:
+        pr   = filt(rows2, threads=float(p))
+        tp_m = met([r["T_parallel"] for r in pr])
+        if not tp_m: continue
+
+        sp  = t_ser_base / tp_m["min"]
+        eff = sp / p
+
+        thr2.append(p)
+        tp_min_l.append(tp_m["min"])
+        tp_avg_l.append(tp_m["avg"])
+        sp_l.append(sp)
+        eff_l.append(eff)
+
+        print(f"  {p:>4} {tp_m['n']:>4} {t_ser_base:>10.6f} {tp_m['min']:>10.6f} "
+              f"{tp_m['avg']:>10.6f} {sp:>9.4f} {eff:>7.4f}")
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle("Task 2 — Numerical Integration  (nsteps=40 000 000, best of 50 runs)",
+                 fontweight="bold")
+    p_lin = list(range(1, max(thr2)+1))
+
+    ax = axes[0]
+    ax.axhline(t_ser_base, color="gray", ls="--", lw=1.5,
+               label=f"Serial min={t_ser_base:.4f}s")
+    ax.plot(thr2, tp_min_l, "o-",  color="steelblue", lw=2, label="Parallel (min)")
+    ax.plot(thr2, tp_avg_l, "o--", color="steelblue", lw=1, alpha=0.45, label="Parallel (avg)")
+    ax.set_xlabel("Threads (p)"); ax.set_ylabel("Time, sec")
+    ax.set_title("Execution Time"); ax.legend(fontsize=10)
+    ax.xaxis.set_major_locator(ticker.FixedLocator(thr2))
+
+    ax = axes[1]
+    ax.plot(p_lin, p_lin, "k--", lw=1.2, label="Linear")
+    ax.plot(thr2, sp_l, "o-", color="steelblue", lw=2, label="Speedup")
+    ax.set_xlabel("Threads (p)"); ax.set_ylabel("Speedup $S_p$")
+    ax.set_title("Speedup"); ax.legend()
+    ax.xaxis.set_major_locator(ticker.FixedLocator(thr2))
+
+    ax = axes[2]
+    ax.axhline(1.0, color="k", ls="--", lw=1.2, label="Ideal")
+    ax.plot(thr2, eff_l, "o-", color="steelblue", lw=2, label="Efficiency")
+    ax.set_xlabel("Threads (p)"); ax.set_ylabel("Efficiency $E_p$")
+    ax.set_title("Efficiency"); ax.set_ylim(0, 1.15); ax.legend()
+    ax.xaxis.set_major_locator(ticker.FixedLocator(thr2))
+
+    plt.tight_layout()
+    plt.savefig("speedup_integrate.pdf", bbox_inches="tight")
+    plt.close()
+    print("\n  Saved: speedup_integrate.pdf")
+
+except FileNotFoundError:
+    print("  [SKIP] 2_2_raw.txt not found")
+
+
+# ──────────────────────────────────────────────────────────────
+# TASK 3 — SLA
+# ──────────────────────────────────────────────────────────────
+print("\n" + "=" * 55)
+print("TASK 3 — SLA Simple Iteration")
+print("=" * 55)
+
+try:
+    rows3 = parse_file("2_3_raw.txt")
+    print(f"  Loaded {len(rows3)} rows")
+
+    threads_list = sorted(set(int(r["threads"]) for r in rows3))
+    results3 = {}
+
+    for var in [1, 2]:
+        t1_rows = filt(rows3, variant=float(var), threads=1.0)
+        t1_base = min(r["time"] for r in t1_rows) if t1_rows else None
+        print(f"\n  Variant {var}  (T1_base={t1_base:.4f}s)")
+        print(f"  {'p':>4} {'n':>3} {'T_min':>9} {'T_avg':>9} {'T_max':>9} {'Sp':>8} {'Eff':>7}")
+        print("  " + "-"*55)
+        for p in threads_list:
+            pr = filt(rows3, variant=float(var), threads=float(p))
+            tm = met([r["time"] for r in pr])
+            if not tm: continue
+            sp  = t1_base / tm["min"]
+            eff = sp / p
+            results3[(var, p)] = {**tm, "sp": sp, "eff": eff}
+            print(f"  {p:>4} {tm['n']:>3} {tm['min']:>9.4f} {tm['avg']:>9.4f} "
+                  f"{tm['max']:>9.4f} {sp:>8.4f} {eff:>7.4f}")
+
+    colors = {1: "steelblue", 2: "darkorange"}
+    labels = {1: "Variant 1 (separate omp parallel for)",
+              2: "Variant 2 (single omp parallel)"}
+    p_lin  = list(range(1, max(threads_list)+1))
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle("Task 3 — SLA Simple Iteration  (N=14 000, best of 3 runs)",
+                 fontweight="bold")
+
+    for ax, key, ylabel, title in zip(
+        axes,
+        ["min", "sp", "eff"],
+        ["Time T(p), sec", "Speedup S(p)", "Efficiency E(p)"],
+        ["Execution Time", "Speedup", "Efficiency"]
+    ):
+        if key == "sp":
+            ax.plot(p_lin, p_lin, "k--", lw=1.2, label="Linear")
+        if key == "eff":
+            ax.axhline(1.0, color="k", ls="--", lw=1.2, label="Ideal")
+        for var in [1, 2]:
+            thr = [p for p in threads_list if (var,p) in results3]
+            vals = [results3[(var,p)][key] for p in thr]
+            ax.plot(thr, vals, "o-" if var==1 else "s-",
+                    color=colors[var], lw=2, label=labels[var])
+        ax.set_xlabel("Threads (p)"); ax.set_ylabel(ylabel)
+        ax.set_title(title); ax.legend(fontsize=9)
+        ax.xaxis.set_major_locator(ticker.FixedLocator(threads_list))
+        if key == "eff": ax.set_ylim(0, 1.1)
+
+    plt.tight_layout()
+    plt.savefig("lab2_graphs.pdf", bbox_inches="tight")
+    plt.close()
+    print("\n  Saved: lab2_graphs.pdf")
+
+except FileNotFoundError:
+    print("  [SKIP] 2_3_raw.txt not found")
+
+
+# ──────────────────────────────────────────────────────────────
+# TASK 3 — Schedule Research
+# ──────────────────────────────────────────────────────────────
+print("\n" + "=" * 55)
+print("TASK 3 — Schedule Research")
+print("=" * 55)
+
+try:
+    rows_s = parse_file("2_3_schedule_raw.txt")
+    print(f"  Loaded {len(rows_s)} rows")
+
+    schedules = ["static", "dynamic", "guided"]
+    chunks    = [10, 25, 50, 100]
+    colors_s  = {"static": "steelblue", "dynamic": "darkorange", "guided": "forestgreen"}
+
+    sched_res = {}
+    print(f"\n  {'Schedule':>10} {'Chunk':>6} {'n':>4} {'T_min':>10} {'T_avg':>10} {'T_max':>10}")
+    print("  " + "-"*55)
+
+    for sched in schedules:
+        for chunk in chunks:
+            pr = [r for r in rows_s
+                  if r.get("schedule") == sched and int(r.get("chunk",0)) == chunk]
+            tm = met([r["time"] for r in pr])
+            if not tm:
+                print(f"  {sched:>10} {chunk:>6}  no data")
+                continue
+            sched_res[(sched, chunk)] = tm
+            print(f"  {sched:>10} {chunk:>6} {tm['n']:>4} "
+                  f"{tm['min']:>10.6f} {tm['avg']:>10.6f} {tm['max']:>10.6f}")
+
+    if not sched_res:
+        raise ValueError("no data")
+
+    x      = np.arange(len(chunks))
+    width  = 0.25
+    labels_c = [str(c) for c in chunks]
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle("Task 3 — Schedule Research  (N=14 000, 8 threads, 50 runs)",
+                 fontweight="bold")
+
+    for ax, metric, title in zip(axes, ["min", "avg"], ["Min Time", "Avg Time"]):
+        for idx, sched in enumerate(schedules):
+            vals = [sched_res.get((sched,c), {}).get(metric, 0) for c in chunks]
+            bars = ax.bar(x + idx*width, vals, width, label=sched,
+                          color=colors_s[sched], alpha=0.85)
+            for bar, v in zip(bars, vals):
+                if v > 0:
+                    ax.text(bar.get_x() + bar.get_width()/2,
+                            bar.get_height() + 0.001,
+                            f"{v:.3f}", ha="center", va="bottom", fontsize=8)
+        ax.set_xlabel("Chunk size"); ax.set_ylabel("Time, sec")
+        ax.set_title(f"{title} by Schedule & Chunk")
+        ax.set_xticks(x + width); ax.set_xticklabels(labels_c)
+        ax.legend()
+
+    plt.tight_layout()
+    plt.savefig("schedule_research.pdf", bbox_inches="tight")
+    plt.close()
+    print("\n  Saved: schedule_research.pdf")
+
+except (FileNotFoundError, ValueError) as e:
+    print(f"  [SKIP] {e}")
+
+print("\nAll done!")"""
 plot_results.py  —  строит графики для заданий 2 и 3
 Запуск: python3 plot_results.py
 """
